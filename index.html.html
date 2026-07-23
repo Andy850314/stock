@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TWSCAN Web｜台股籌碼終端（純瀏覽器版）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.3/lightweight-charts.standalone.production.min.js"></script>
+<style>
+  :root{
+    --bg:#0A0C10; --panel:#12161D; --panel2:#171C25; --line:#222B37;
+    --red:#FF4A3D; --green:#00B368; --amber:#F5C518; --txt:#E8ECF3; --mut:#7E8AA0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:'Noto Sans TC',sans-serif;font-size:14px}
+  .mono{font-family:'IBM Plex Mono',monospace}
+  header{display:flex;align-items:baseline;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{font-family:'IBM Plex Mono',monospace;font-size:18px;letter-spacing:.18em;color:var(--amber);text-shadow:0 0 12px rgba(245,197,24,.35)}
+  header .sub{color:var(--mut);font-size:12px}
+  header .disc{margin-left:auto;color:var(--mut);font-size:11px}
+  nav{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--line);overflow-x:auto}
+  nav button{background:none;border:none;color:var(--mut);padding:11px 16px;font-size:14px;font-family:inherit;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+  nav button.on{color:var(--txt);border-color:var(--amber)}
+  nav button:focus-visible{outline:1px solid var(--amber)}
+  main{padding:16px 18px;max-width:1080px;margin:0 auto}
+  .hide{display:none}
+  .searchbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  input[type=text],textarea{background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:9px 12px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:14px}
+  input[type=text]:focus,textarea:focus{outline:1px solid var(--amber)}
+  .searchbar input{flex:1;max-width:320px}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:9px 14px;border-radius:6px;cursor:pointer;font-family:inherit;transition:border-color .15s}
+  .btn:hover{border-color:var(--mut)}
+  .btn.on{border-color:var(--amber);color:var(--amber)}
+  .btn.primary{border-color:var(--amber);color:var(--amber)}
+  .btn:disabled{opacity:.45;cursor:default}
+  .stockhead{display:flex;align-items:baseline;gap:12px;margin:6px 0 8px;flex-wrap:wrap}
+  .stockhead .nm{font-size:17px;font-weight:700}
+  .stockhead .px{font-size:20px}
+  .up{color:var(--red)} .dn{color:var(--green)}
+  .volmodes{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap}
+  .volmodes .btn{padding:5px 12px;font-size:12px}
+  #chart,#volchart{border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  #volchart{margin-top:6px}
+  .kmeta{color:var(--mut);font-size:12px;margin-top:8px;line-height:1.7}
+  table{width:100%;border-collapse:collapse}
+  th{color:var(--mut);font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px}
+  td{padding:9px 10px;border-bottom:1px solid var(--line)}
+  tr.rowlink{cursor:pointer} tr.rowlink:hover{background:var(--panel)}
+  .lamp{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:7px;background:#2A3340}
+  .lamp.red{background:var(--red);box-shadow:0 0 10px var(--red)}
+  .lamp.yellow{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+  .lamp.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:10px}
+  .card .top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .card .sc{margin-left:auto;font-size:18px;color:var(--amber)}
+  .reasons{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+  .reasons span{border:1px solid var(--line);border-radius:4px;padding:2px 8px;font-size:12px;color:var(--mut)}
+  .empty{color:var(--mut);padding:30px 0;text-align:center}
+  .note{color:var(--mut);font-size:12px;margin-top:14px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .verdict{border:1px solid var(--line);border-radius:8px;padding:16px;margin:12px 0;background:var(--panel)}
+  .verdict .big{font-size:16px;font-weight:700}
+  .progress{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:10px 0}
+  .progress i{display:block;height:100%;width:0;background:var(--amber);transition:width .2s}
+  .settings{border-top:1px solid var(--line);margin-top:26px;padding-top:12px}
+  .settings summary{color:var(--mut);cursor:pointer;font-size:12px}
+  .settings .row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:8px;font-size:13px;z-index:9;max-width:90vw}
+  textarea{width:100%;min-height:150px;font-size:12px;line-height:1.5}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--mut);margin:3px 4px 3px 0}
+  .chip b{color:var(--txt);font-weight:500}
+  .chip button{background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;padding:0}
+  @media(max-width:640px){header .disc{display:none} main{padding:12px}}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>TWSCAN</h1><span class="sub">純瀏覽器版</span>
+  <span class="sub mono" id="hdrDate">--</span>
+  <span class="sub mono" id="routeStat"></span>
+  <span class="disc">籌碼為機率訊號，非投資建議</span>
+</header>
+<nav>
+  <button class="on" data-tab="t1">個股 K 線</button>
+  <button data-tab="t2">隔日沖分點分析</button>
+  <button data-tab="t3">主升浪掃描</button>
+</nav>
+<main>
+
+<!-- ── Tab 1 個股 ─────────────────────────── -->
+<section id="t1">
+  <div class="searchbar">
+    <input id="q" placeholder="輸入代號或名稱，例：2330 / 台積電" autocomplete="off">
+    <button class="btn primary" id="btnSearch">查詢</button>
+  </div>
+  <div id="sMsg" class="empty">輸入代號開始查詢（上市走 TWSE、上櫃走 TPEx）</div>
+  <div id="stockArea" class="hide">
+    <div class="stockhead">
+      <span class="nm" id="sNm"></span><span class="mono" id="sId" style="color:var(--mut)"></span>
+      <span class="px mono" id="sPx"></span><span class="mono" id="sChg"></span>
+      <span class="mono" id="sDt" style="color:var(--mut);font-size:12px"></span>
+    </div>
+    <div id="chart" style="height:340px"></div>
+    <div class="volmodes">
+      <button class="btn on" data-vm="total">總量</button>
+      <button class="btn" data-vm="real">實質量（扣當沖）</button>
+      <button class="btn" data-vm="dt">當沖量</button>
+      <span class="kmeta" id="dtCover"></span>
+    </div>
+    <div id="volchart" style="height:130px"></div>
+    <div class="kmeta">紅漲綠跌（台股慣例）｜實質量＝成交量−當沖成交量｜當沖量需逐日抓取，預設回補近 20 個交易日</div>
+  </div>
+</section>
+
+<!-- ── Tab 2 分點 ─────────────────────────── -->
+<section id="t2" class="hide">
+  <div class="grid2">
+    <div>
+      <div class="searchbar" style="margin-bottom:8px">
+        <input id="bsrStk" placeholder="股票代號（用來查成交量）" style="max-width:200px">
+        <button class="btn primary" id="btnBsr">分析</button>
+      </div>
+      <textarea id="bsrCsv" placeholder="把 bsr.twse.com.tw 下載的「券商買賣日報表」CSV 內容整份貼進來（保留原格式即可）"></textarea>
+      <div class="note">流程：到 <span class="mono">bsr.twse.com.tw</span> 查該股 → 下載 CSV → 全選貼上 → 按分析。工具會彙總各分點買賣、比對右側隔日沖名單。</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px;color:var(--mut);font-size:12px">隔日沖分點名單（點 × 移除，可自行增補，存在瀏覽器）</div>
+      <div id="brokerChips"></div>
+      <div class="searchbar" style="margin-top:8px">
+        <input id="brokerNew" placeholder="新增關鍵字，例：凱基-台北" style="max-width:220px">
+        <button class="btn" id="btnAddBroker">新增</button>
+      </div>
+    </div>
+  </div>
+  <div id="bsrOut"></div>
+  <div class="note">燈號：隔日沖分點合計淨買超佔當日成交量 ≥2% 黃燈、≥5% 紅燈 → 隔日開高走低機率升高。買賣均價差距小、買賣量對敲高的分點也會標註。</div>
+</section>
+
+<!-- ── Tab 3 掃描 ─────────────────────────── -->
+<section id="t3" class="hide">
+  <div class="searchbar">
+    <button class="btn primary" id="btnScan">開始掃描</button>
+    <span class="kmeta" id="scanStat">粗篩全市場 → 前 60 檔逐檔抓 4 個月 K 線計分，約 1–2 分鐘</span>
+  </div>
+  <div class="progress hide" id="scanProg"><i></i></div>
+  <div id="scanArea"></div>
+  <div class="note">條件：多頭排列（收盤＞20MA＞60MA）＋ 20MA 上彎 ＋ 創/逼近 60 日高 ＋ 量增 ＋ 當日漲幅相對強度 ＋ 當沖比不過熱。掃描結果會快取到當日收盤。</div>
+</section>
+
+<details class="settings">
+  <summary>連線設定（CORS 代理）</summary>
+  <div class="row">
+    <label><input type="checkbox" id="useProxy"> 強制使用自訂代理（覆寫自動降級）</label>
+    <input id="proxyUrl" type="text" placeholder="https://your-proxy/?url=" style="flex:1;max-width:420px">
+    <span class="kmeta">預設會自動嘗試：直連 → corsproxy → allorigins，並記住可用路線。只有想指定自架代理時才勾這裡。公共代理會看到請求內容，僅適合公開行情資料。</span>
+  </div>
+</details>
+
+</main>
+<div class="toast hide" id="toast"></div>
+<script>
+'use strict';
+/* ───────── 基礎工具 ───────── */
+const $ = s => document.querySelector(s);
+const C = { red:'#FF4A3D', green:'#00B368', amber:'#F5C518', mut:'#7E8AA0' };
+const fnum = x => { if(x==null) return null; const s=String(x).replace(/,/g,'').trim();
+  if(!s||['--','---','-','X','N/A'].includes(s)) return null; const v=parseFloat(s); return isNaN(v)?null:v; };
+const fmt = n => n==null?'--':Math.round(n).toLocaleString('zh-TW');
+const roc2iso = s => { const m=String(s).trim().match(/^(\d{2,3})\/(\d{2})\/(\d{2})$/);
+  return m ? `${+m[1]+1911}-${m[2]}-${m[3]}` : null; };
+const ls = { get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+             set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+function toast(msg, ms=4200){ const t=$('#toast'); t.textContent=msg; t.classList.remove('hide');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.add('hide'), ms); }
+
+/* ───────── 節流請求＋CORS 多路線自動降級 ───────── */
+let lastReq = 0;
+const ROUTES = [
+  { name:'直連',      wrap:u=>u },
+  { name:'corsproxy', wrap:u=>'https://corsproxy.io/?url='+encodeURIComponent(u) },
+  { name:'allorigins',wrap:u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u) },
+];
+const routeMemo = ls.get('twscan_routes', {});   // hostname -> route index
+
+function setRouteBadge(host, idx){
+  const el=$('#routeStat'); if(!el) return;
+  el.textContent = `連線：${host.replace('www.','')} → ${ROUTES[idx].name}`;
+}
+
+async function tryFetch(u, ms=15000){
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(), ms);
+  try{
+    const r=await fetch(u,{signal:ctl.signal});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
+async function fetchJSON(url){
+  const gap = 320 - (Date.now()-lastReq);
+  if(gap>0) await new Promise(r=>setTimeout(r,gap));
+  lastReq = Date.now();
+
+  // 自訂代理優先（進階者用）
+  if($('#useProxy').checked && $('#proxyUrl').value.trim()){
+    return tryFetch($('#proxyUrl').value.trim() + encodeURIComponent(url));
+  }
+  const host = new URL(url).hostname;
+  const order = [];
+  if(routeMemo[host]!=null) order.push(routeMemo[host]);
+  for(let i=0;i<ROUTES.length;i++) if(!order.includes(i)) order.push(i);
+
+  let lastErr;
+  for(const i of order){
+    try{
+      const data = await tryFetch(ROUTES[i].wrap(url));
+      if(routeMemo[host]!==i){ routeMemo[host]=i; ls.set('twscan_routes',routeMemo); }
+      setRouteBadge(host, i);
+      return data;
+    }catch(e){ lastErr=e; }
+  }
+  throw new Error(`${host} 三條路線皆失敗（${lastErr&&lastErr.message}）`);
+}
+
+/* ───────── 今日全市場快照 ───────── */
+const state = { uni:null, uniDate:null, dtCache:new Map(), cur:null, curSeries:null,
+                volmode:'total', kchart:null, vchart:null, ks:null, vs:null };
+
+async function loadUniverse(){
+  if(state.uni) return state.uni;
+  const uni = new Map();
+  const tw = await fetchJSON('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
+  for(const d of tw){
+    const id=(d.Code||'').trim(); if(!/^\d{4}$/.test(id)) continue;
+    const c=fnum(d.ClosingPrice), v=fnum(d.TradeVolume); if(c==null||!v) continue;
+    const chg=fnum(d.Change)||0;
+    uni.set(id,{ id, name:(d.Name||'').trim(), mkt:'twse', c, v,
+      val:fnum(d.TradeValue)||0, chgPct: c-chg>0 ? chg/(c-chg)*100 : 0, dt_v:0 });
+  }
+  try{
+    const tp = await fetchJSON('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes');
+    for(const d of tp){
+      const id=String(d.SecuritiesCompanyCode||'').trim(); if(!/^\d{4}$/.test(id)) continue;
+      const c=fnum(d.Close), v=fnum(d.TradingShares); if(c==null||!v) continue;
+      const chg=fnum(d.Change)||0;
+      uni.set(id,{ id, name:String(d.CompanyName||'').trim(), mkt:'tpex', c, v,
+        val:fnum(d.TransactionAmount)||0, chgPct: c-chg>0 ? chg/(c-chg)*100 : 0, dt_v:0 });
+    }
+  }catch(e){ toast('上櫃快照抓取失敗，先以上市為主'); }
+  state.uni = uni;
+  $('#hdrDate').textContent = new Date().toISOString().slice(0,10) + '｜' + uni.size + ' 檔';
+  return uni;
+}
+
+/* ───────── 個股歷史 K（近 6 個月） ───────── */
+function monthStarts(n){
+  const out=[], d=new Date();
+  for(let i=0;i<n;i++){ out.push(new Date(d.getFullYear(), d.getMonth()-i, 1)); }
+  return out.reverse();
+}
+const ymd = d => d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+
+async function fetchHistory(id, mkt, months=6){
+  const bars=[];
+  for(const m of monthStarts(months)){
+    try{
+      if(mkt==='twse'){
+        const j = await fetchJSON(`https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=${ymd(m)}&stockNo=${id}&response=json`);
+        if(j.stat!=='OK'||!j.data) continue;
+        for(const r of j.data){
+          const t=roc2iso(r[0]); if(!t) continue;
+          const [o,h,l,c]=[fnum(r[3]),fnum(r[4]),fnum(r[5]),fnum(r[6])];
+          const v=fnum(r[1]); if(c==null||o==null) continue;
+          bars.push({t,o,h,l,c,v:v||0});
+        }
+      }else{
+        const ds=`${m.getFullYear()}/${String(m.getMonth()+1).padStart(2,'0')}/01`;
+        const j = await fetchJSON(`https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock?code=${id}&date=${ds}&response=json`);
+        const rows=(j.tables&&j.tables[0]&&j.tables[0].data)||j.aaData||[];
+        for(const r of rows){
+          const t=roc2iso(r[0]); if(!t) continue;
+          const [o,h,l,c]=[fnum(r[3]),fnum(r[4]),fnum(r[5]),fnum(r[6])];
+          let v=fnum(r[1]); if(c==null||o==null) continue;
+          if(v!=null) v*=1000; // TPEx 單位為千股
+          bars.push({t,o,h,l,c,v:v||0});
+        }
+      }
+    }catch(e){ /* 單月失敗略過 */ }
+  }
+  const seen=new Set();
+  return bars.filter(b=>!seen.has(b.t)&&seen.add(b.t)).sort((a,b)=>a.t<b.t?-1:1);
+}
+
+/* ───────── 當沖量（TWTB4U 逐日，全域快取） ───────── */
+async function loadDT(dateISO){
+  if(state.dtCache.has(dateISO)) return state.dtCache.get(dateISO);
+  const d = dateISO.replace(/-/g,'');
+  let m = new Map();
+  try{
+    const j = await fetchJSON(`https://www.twse.com.tw/rwd/zh/afterTrading/TWTB4U?date=${d}&selectType=All&response=json`);
+    if(j.stat==='OK'&&j.fields&&j.data){
+      const iId = j.fields.findIndex(f=>f.includes('證券代號'));
+      const iV  = j.fields.findIndex(f=>f.includes('成交股數'));
+      if(iId>=0&&iV>=0) for(const r of j.data){
+        const id=String(r[iId]).trim(), v=fnum(r[iV]);
+        if(/^\d{4}$/.test(id)&&v) m.set(id,v);
+      }
+    }
+  }catch(e){ /* 假日或失敗 → 空 */ }
+  state.dtCache.set(dateISO,m);
+  return m;
+}
+
+async function backfillDT(series, id, n=20){
+  const targets = series.slice(-n);
+  let done=0, hit=0;
+  for(const b of targets){
+    const m = await loadDT(b.t);
+    if(m.has(id)){ b.dt=m.get(id); hit++; }
+    done++;
+    $('#dtCover').textContent = `當沖量回補 ${done}/${targets.length}`;
+    if(state.cur===id) renderVol();
+  }
+  $('#dtCover').textContent = hit ? `當沖量涵蓋近 ${hit} 個交易日` : '此標的近期無當沖資料（或為上櫃，僅支援上市）';
+}
+
+/* ───────── K 線繪圖 ───────── */
+const chartOpts = el => ({ layout:{background:{color:'transparent'},textColor:C.mut},
+  grid:{vertLines:{color:'#161B23'},horzLines:{color:'#161B23'}},
+  rightPriceScale:{borderColor:'#222B37'}, timeScale:{borderColor:'#222B37'},
+  width: el.clientWidth, height: el.clientHeight });
+
+function ensureCharts(){
+  if(state.kchart) return;
+  const ce=$('#chart'), ve=$('#volchart');
+  state.kchart=LightweightCharts.createChart(ce, chartOpts(ce));
+  state.ks=state.kchart.addCandlestickSeries({upColor:C.red,downColor:C.green,
+    wickUpColor:C.red,wickDownColor:C.green,borderVisible:false});
+  state.vchart=LightweightCharts.createChart(ve, chartOpts(ve));
+  state.vs=state.vchart.addHistogramSeries({priceFormat:{type:'volume'}});
+  new ResizeObserver(()=>{ state.kchart.applyOptions({width:ce.clientWidth});
+    state.vchart.applyOptions({width:ve.clientWidth}); }).observe(ce);
+}
+
+function renderVol(){
+  const s=state.curSeries; if(!s) return;
+  const mode=state.volmode;
+  state.vs.setData(s.map((b,i)=>{
+    const dt=b.dt||0;
+    let v = mode==='total'? b.v : mode==='real'? Math.max(b.v-dt,0) : dt;
+    const up = i===0 || b.c>=s[i-1].c;
+    return { time:b.t, value:Math.round(v/1000),
+      color:(mode==='dt'?C.amber:(up?C.red:C.green))+'CC' };
+  }));
+  state.vchart.timeScale().fitContent();
+}
+
+async function doSearch(){
+  const q=$('#q').value.trim(); if(!q) return;
+  const msg=$('#sMsg'); msg.classList.remove('hide'); msg.textContent='載入快照…';
+  try{
+    const uni=await loadUniverse();
+    let id = uni.has(q)?q:null;
+    if(!id) for(const [k,r] of uni) if(r.name.includes(q)){ id=k; break; }
+    if(!id){ msg.textContent='查無此標的'; return; }
+    const info=uni.get(id);
+    msg.textContent=`抓取 ${info.name} 近 6 個月 K 線…`;
+    const series=await fetchHistory(id, info.mkt);
+    if(!series.length){ msg.textContent='歷史 K 線抓取失敗（可嘗試啟用 CORS 代理）'; return; }
+    state.cur=id; state.curSeries=series;
+    msg.classList.add('hide'); $('#stockArea').classList.remove('hide');
+    const last=series[series.length-1], prev=series[series.length-2];
+    const chg = prev? (last.c/prev.c-1)*100 : 0;
+    $('#sNm').textContent=info.name; $('#sId').textContent=id+'（'+(info.mkt==='twse'?'上市':'上櫃')+'）';
+    $('#sPx').textContent=last.c; $('#sChg').textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';
+    $('#sPx').className='px mono '+(chg>=0?'up':'dn'); $('#sChg').className='mono '+(chg>=0?'up':'dn');
+    $('#sDt').textContent='';
+    ensureCharts();
+    state.ks.setData(series.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
+    state.kchart.timeScale().fitContent();
+    renderVol();
+    if(info.mkt==='twse') backfillDT(series, id);
+    else $('#dtCover').textContent='上櫃當沖歷史暫不支援，量能以總量為準';
+  }catch(e){ msg.textContent='載入失敗：'+e.message; }
+}
+
+/* ───────── 分點分析 ───────── */
+const DEFAULT_BROKERS = ['凱基-台北','凱基-松山','富邦-建國','統一-嘉義','美好','元大-土城永寧','群益金鼎-大直','國票-敦北法人'];
+let brokers = ls.get('twscan_brokers', DEFAULT_BROKERS.slice());
+
+function renderChips(){
+  $('#brokerChips').innerHTML = brokers.map((b,i)=>
+    `<span class="chip"><b>${b}</b><button data-i="${i}" aria-label="移除">×</button></span>`).join('');
+  document.querySelectorAll('#brokerChips button').forEach(x=>x.onclick=()=>{
+    brokers.splice(+x.dataset.i,1); ls.set('twscan_brokers',brokers); renderChips(); });
+}
+
+function parseBSR(text){
+  const agg=new Map();
+  for(const line of text.split(/\r?\n/)){
+    const cells=line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    for(const off of [0,6]){
+      if(cells.length<off+5) continue;
+      const [seq,broker,price,buy,sell]=cells.slice(off,off+5);
+      if(!/^\d+$/.test(seq)||!broker) continue;
+      const p=fnum(price), b=fnum(buy), s=fnum(sell);
+      if(p==null||b==null||s==null) continue;
+      const a=agg.get(broker)||{buy:0,sell:0,bpv:0,spv:0};
+      a.buy+=b; a.sell+=s; a.bpv+=p*b; a.spv+=p*s; agg.set(broker,a);
+    }
+  }
+  return [...agg.entries()].map(([broker,a])=>({ broker, buy:a.buy, sell:a.sell,
+    net:a.buy-a.sell, avgB:a.buy?a.bpv/a.buy:null, avgS:a.sell?a.spv/a.sell:null }))
+    .sort((x,y)=>y.net-x.net);
+}
+
+async function doBsr(){
+  const id=$('#bsrStk').value.trim(), text=$('#bsrCsv').value;
+  const out=$('#bsrOut');
+  if(!text.trim()){ out.innerHTML='<div class="empty">請先貼上 CSV 內容</div>'; return; }
+  const rows=parseBSR(text);
+  if(!rows.length){ out.innerHTML='<div class="empty">解析失敗：格式看起來不是券商買賣日報表 CSV</div>'; return; }
+  let vol=null, name='';
+  if(/^\d{4}$/.test(id)){
+    try{ const uni=await loadUniverse(); if(uni.has(id)){ vol=uni.get(id).v; name=uni.get(id).name; } }catch(e){}
+  }
+  const hits=rows.filter(r=>r.net>0 && brokers.some(k=>r.broker.includes(k)));
+  const netSum=hits.reduce((a,r)=>a+r.net,0);
+  const pct = vol? netSum/vol*100 : null;
+  const risk = pct==null? null : pct>=5?'red' : pct>=2?'yellow' : 'green';
+  const lampTxt = risk==='red'?'紅燈：隔日沖分點大量進場，隔日開高走低風險高'
+    : risk==='yellow'?'黃燈：隔日沖分點進場，留意隔日賣壓'
+    : risk==='green'?'綠燈：隔日沖分點佔比低'
+    : '未能取得當日成交量（代號未填或非今日資料），僅列分點明細';
+  out.innerHTML = `
+    <div class="verdict"><span class="lamp ${risk||''}"></span>
+      <span class="big">${name?name+'（'+id+'）｜':''}${lampTxt}</span>
+      <div class="kmeta" style="margin-top:6px">名單分點合計淨買超 ${fmt(netSum/1000)} 張${pct!=null?`，佔成交量 ${pct.toFixed(2)}%`:''}</div>
+    </div>
+    <table><thead><tr><th>分點</th><th>買進(張)</th><th>賣出(張)</th><th>淨買超(張)</th><th>買均</th><th>賣均</th><th></th></tr></thead>
+    <tbody>${rows.slice(0,15).map(r=>{
+      const hit=brokers.some(k=>r.broker.includes(k));
+      return `<tr${hit?' style="color:var(--amber)"':''}><td>${r.broker}${hit?'（名單）':''}</td>
+        <td class="mono">${fmt(r.buy/1000)}</td><td class="mono">${fmt(r.sell/1000)}</td>
+        <td class="mono">${fmt(r.net/1000)}</td>
+        <td class="mono">${r.avgB?r.avgB.toFixed(2):'--'}</td><td class="mono">${r.avgS?r.avgS.toFixed(2):'--'}</td>
+        <td class="tagset">${r.buy&&r.sell&&Math.min(r.buy,r.sell)/Math.max(r.buy,r.sell)>0.6?'對敲高':''}</td></tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+/* ───────── 主升浪掃描 ───────── */
+const ma=(a,n)=>a.length>=n? a.slice(-n).reduce((x,y)=>x+y,0)/n : null;
+
+async function doScan(){
+  const btn=$('#btnScan'), prog=$('#scanProg'), bar=$('#scanProg i'), stat=$('#scanStat'), area=$('#scanArea');
+  const key='twscan_scan_'+new Date().toISOString().slice(0,10);
+  const cached=ls.get(key,null);
+  if(cached){ renderScan(cached); stat.textContent='已載入今日快取（重新掃描請清 localStorage）'; return; }
+  btn.disabled=true; prog.classList.remove('hide'); area.innerHTML='';
+  try{
+    stat.textContent='載入全市場快照…';
+    const uni=await loadUniverse();
+    const all=[...uni.values()].filter(r=>r.val>=5e7 && r.c>=10 && !r.id.startsWith('00'));
+    const chgs=all.map(r=>r.chgPct).sort((a,b)=>a-b);
+    const pctOf=v=>chgs.length? (chgs.filter(x=>x<=v).length/chgs.length*100):0;
+    const cands=[...all].sort((a,b)=>b.chgPct-a.chgPct).slice(0,45)
+      .concat([...all].sort((a,b)=>b.val-a.val).slice(0,30));
+    const uniq=[...new Map(cands.map(r=>[r.id,r])).values()].slice(0,60);
+    // 今日當沖比
+    let dtToday=new Map();
+    try{ dtToday=await loadDT(new Date().toISOString().slice(0,10)); }catch(e){}
+    const results=[];
+    for(let i=0;i<uniq.length;i++){
+      const r=uniq[i];
+      stat.textContent=`計分中 ${i+1}/${uniq.length}：${r.name}`;
+      bar.style.width=((i+1)/uniq.length*100)+'%';
+      const s=await fetchHistory(r.id, r.mkt, 4);
+      if(s.length<62) continue;
+      const cs=s.map(b=>b.c), vs=s.map(b=>b.v);
+      const c=cs[cs.length-1], m20=ma(cs,20), m60=ma(cs,60), m20p=ma(cs.slice(0,-3),20);
+      if(!(m20&&m60&&m20p)||!(c>m20&&m20>m60)) continue;
+      const hi60=Math.max(...cs.slice(-60,-1)), v5=ma(vs,5), v20=ma(vs,20);
+      const dtv=dtToday.get(r.id)||0, dtRatio=r.v? dtv/r.v*100:0;
+      let score=25, reasons=['多頭排列 C>20MA>60MA'];
+      if(m20>m20p*1.001){ score+=15; reasons.push('20MA 上彎'); }
+      if(c>=hi60){ score+=25; reasons.push('創 60 日新高'); }
+      else if(c>=hi60*0.97){ score+=12; reasons.push('逼近 60 日高(<3%)'); }
+      if(v5&&v20&&v5>=v20*1.5){ score+=15; reasons.push(`量增 ${(v5/v20).toFixed(1)}x`); }
+      const rp=pctOf(r.chgPct);
+      if(rp>=85){ score+=15; reasons.push(`今日強度前 ${(100-rp).toFixed(0)}%`); }
+      if(dtRatio>45){ score-=20; reasons.push(`當沖比過熱 ${dtRatio.toFixed(0)}%`); }
+      else if(dtRatio>0&&dtRatio<25){ score+=5; reasons.push('當沖比溫和'); }
+      if(score>=55) results.push({ id:r.id, name:r.name, c, chg:+r.chgPct.toFixed(2),
+        score:+score.toFixed(1), dt:+dtRatio.toFixed(1), reasons });
+    }
+    results.sort((a,b)=>b.score-a.score);
+    const top=results.slice(0,10);
+    ls.set(key,top); renderScan(top);
+    stat.textContent=`完成：${uniq.length} 檔計分，${top.length} 檔入選`;
+  }catch(e){ stat.textContent='掃描失敗：'+e.message; }
+  btn.disabled=false; prog.classList.add('hide'); bar.style.width='0';
+}
+
+function renderScan(list){
+  const el=$('#scanArea');
+  if(!list.length){ el.innerHTML='<div class="empty">無符合條件的標的</div>'; return; }
+  el.innerHTML='';
+  for(const s of list){
+    const d=document.createElement('div'); d.className='card rowlink';
+    const cls=s.chg>=0?'up':'dn';
+    d.innerHTML=`<div class="top"><b>${s.name}</b><span class="mono" style="color:var(--mut)">${s.id}</span>
+      <span class="mono ${cls}">${s.c}（${s.chg>=0?'+':''}${s.chg}%）</span>
+      <span class="mono" style="color:var(--mut);font-size:12px">${s.dt?('當沖 '+s.dt+'%'):''}</span>
+      <span class="sc mono">${s.score}</span></div>
+      <div class="reasons">${s.reasons.map(r=>`<span>${r}</span>`).join('')}</div>`;
+    d.onclick=()=>{ $('#q').value=s.id; document.querySelector('nav button').click(); doSearch(); };
+    el.appendChild(d);
+  }
+}
+
+/* ───────── 事件繫結 ───────── */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  ['t1','t2','t3'].forEach(id=>$('#'+id).classList.toggle('hide', id!==b.dataset.tab));
+});
+document.querySelectorAll('.volmodes .btn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.volmodes .btn').forEach(x=>x.classList.toggle('on',x===b));
+  state.volmode=b.dataset.vm; renderVol();
+});
+$('#btnSearch').onclick=doSearch;
+$('#q').addEventListener('keydown',e=>{ if(e.key==='Enter') doSearch(); });
+$('#btnBsr').onclick=doBsr;
+$('#btnAddBroker').onclick=()=>{ const v=$('#brokerNew').value.trim();
+  if(v&&!brokers.includes(v)){ brokers.push(v); ls.set('twscan_brokers',brokers); renderChips(); }
+  $('#brokerNew').value=''; };
+$('#btnScan').onclick=doScan;
+$('#proxyUrl').value = ls.get('twscan_proxy','https://corsproxy.io/?url=');
+$('#useProxy').checked = ls.get('twscan_useproxy', false);
+$('#proxyUrl').onchange=()=>ls.set('twscan_proxy',$('#proxyUrl').value);
+$('#useProxy').onchange=()=>ls.set('twscan_useproxy',$('#useProxy').checked);
+renderChips();
+loadUniverse().catch(()=>{ $('#hdrDate').textContent='快照載入失敗，可嘗試啟用代理'; });
+
+</script>
+</body>
+</html>
