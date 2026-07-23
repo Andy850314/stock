@@ -6,7 +6,26 @@
 <title>TWSCAN Web｜台股籌碼終端（純瀏覽器版）</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.3/lightweight-charts.standalone.production.min.js"></script>
+<script>
+/* lightweight-charts 多 CDN 載入（jsdelivr → unpkg → cdnjs） */
+window.__chartLib = (function(){
+  const srcs = [
+    'https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js',
+    'https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.3/lightweight-charts.standalone.production.min.js'
+  ];
+  return new Promise(resolve=>{
+    let i=0;
+    (function next(){
+      if(window.LightweightCharts) return resolve(true);
+      if(i>=srcs.length) return resolve(false);
+      const s=document.createElement('script');
+      s.src=srcs[i++]; s.onload=()=>resolve(!!window.LightweightCharts); s.onerror=next;
+      document.head.appendChild(s);
+    })();
+  });
+})();
+</script>
 <style>
   :root{
     --bg:#0A0C10; --panel:#12161D; --panel2:#171C25; --line:#222B37;
@@ -333,8 +352,10 @@ const chartOpts = el => ({ layout:{background:{color:'transparent'},textColor:C.
   rightPriceScale:{borderColor:'#222B37'}, timeScale:{borderColor:'#222B37'},
   width: el.clientWidth, height: el.clientHeight });
 
-function ensureCharts(){
+async function ensureCharts(){
   if(state.kchart) return;
+  const ok = await window.__chartLib;
+  if(!ok || !window.LightweightCharts) throw new Error('K 線圖表庫（lightweight-charts）三個 CDN 都載入失敗，請檢查網路或擋廣告套件');
   const ce=$('#chart'), ve=$('#volchart');
   state.kchart=LightweightCharts.createChart(ce, chartOpts(ce));
   state.ks=state.kchart.addCandlestickSeries({upColor:C.red,downColor:C.green,
@@ -378,13 +399,17 @@ async function doSearch(){
     $('#sPx').textContent=last.c; $('#sChg').textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';
     $('#sPx').className='px mono '+(chg>=0?'up':'dn'); $('#sChg').className='mono '+(chg>=0?'up':'dn');
     $('#sDt').textContent='';
-    ensureCharts();
+    await ensureCharts();
     state.ks.setData(series.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
     state.kchart.timeScale().fitContent();
     renderVol();
     if(info.mkt==='twse') backfillDT(series, id);
     else $('#dtCover').textContent='上櫃當沖歷史暫不支援，量能以總量為準';
-  }catch(e){ msg.textContent='載入失敗：'+e.message; }
+  }catch(e){
+    $('#stockArea').classList.add('hide');
+    msg.classList.remove('hide');
+    msg.textContent='載入失敗：'+e.message;
+  }
 }
 
 /* ───────── 分點分析 ───────── */
